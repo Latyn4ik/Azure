@@ -1,0 +1,12 @@
+- name: Create App Service
+  azure_rm_webapp:
+    resource_group: "{{ rg_name }}"
+    name: "{{ app_serv_name }}"
+    plan: 
+      resource_group: "{{ rg_name }}"
+      name: "{{ app_plan_name }}"
+      location: "{{ res_location }}"
+      sku: "{{ sku_and_size }}"
+    frameworks:
+      - name: "net_framework"
+        version: "4.0"

@@ -1,0 +1,88 @@
+trigger:
+- master
+
+variables:
+  name: 'ilatincev'
+  enviroment_name: 'test'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: AzureKeyVault@1
+  displayName: Key Vault Secrets
+  inputs:
+    azureSubscription: 'ilatincev-sevice-connection'
+    KeyVaultName: 'ilatincev-kv'
+    SecretsFilter: '*'
+
+- task: AzureCLI@2
+  name: InitAz
+  inputs:
+    azureSubscription: 'ilatincev-sevice-connection'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      pip install 'ansible[azure]'
+      pip install 'pywinrm[azure]'
+      echo "##vso[task.setvariable variable=AZURE_CLIENT_ID;isOutput=true]$servicePrincipalId"
+      echo "##vso[task.setvariable variable=AZURE_SECRET;isOutput=true]$servicePrincipalKey"
+      echo "##vso[task.setvariable variable=AZURE_TENANT;isOutput=true]$tenantId"
+    addSpnToEnvironment: true
+    useGlobalConfig: true
+
+- task: replacetokens@3
+  inputs:
+    rootDirectory: '$(Pipeline.Workspace)'
+    targetFiles: '**/playbook.yml'
+    encoding: 'auto'
+    writeBOM: true
+    escapeType: 'none'
+    actionOnMissing: 'warn'
+    keepToken: false
+    tokenPrefix: '__'
+    tokenSuffix: '__'
+
+- task: Ansible@0 
+  env:
+    AZURE_CLIENT_ID: $(InitAz.AZURE_CLIENT_ID)
+    AZURE_SECRET: $(InitAz.AZURE_SECRET)
+    AZURE_SUBSCRIPTION_ID: $(AZURE-SUBSCRIPTION)
+    AZURE_TENANT: $(InitAz.AZURE_TENANT)
+  inputs:
+    ansibleInterface: 'agentMachine'
+    playbookPathOnAgentMachine: 'playbook.yml'
+    inventoriesAgentMachine: 'noInventory'
+    failOnStdErr: false
+
+
+- task: DotNetCoreCLI@2
+  displayName: Build App
+  inputs:
+    command: 'build'
+    projects: '**/*.csproj'
+
+- task: DotNetCoreCLI@2
+  displayName: Publish App
+  inputs:
+    command: 'publish'
+    publishWebProjects: true
+    arguments: --configuration Release --output $(Build.ArtifactStagingDirectory)
+    zipAfterPublish: true
+
+- task: PublishBuildArtifacts@1
+  displayName: Publish Artifacts
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'webApp'
+    publishLocation: 'Container'
+
+- task: AzureWebApp@1
+  inputs:
+    azureSubscription: 'ilatincev-sevice-connection'
+    appType: 'webApp'
+    appName: '$(name)-App-$(enviroment_name)'
+    deployToSlotOrASE: true
+    resourceGroupName: '$(name)-$(enviroment_name)'
+    slotName: 'production'
+    package: '$(Build.ArtifactStagingDirectory)/WebApp.zip'

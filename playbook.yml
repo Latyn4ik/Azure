@@ -1,0 +1,46 @@
+---
+- name: create resources
+  hosts: localhost
+  connection: local
+  vars: 
+    res_location: westus
+    sername:      ilatincev
+    env_name:     test
+    rg_name:      "{{ sername }}-{{ env_name }}"
+
+    sa_name: "{{ sername }}sa{{ env_name }}"
+    storage_type:  Standard_RAGRS
+
+    vm_name: "ilat-vm"
+    adminUser: __adminUsername__
+    password:  __adminPass__
+    vm_size: Standard_B2s
+    hosts_name: servers
+
+  roles:
+    - { role: Ansible/roles/create_resource_group }
+    - { role: Ansible/roles/create_storage_account }
+    - { role: Ansible/roles/create_app_service_plan_and_service, app_plan_name: "{{ sername }}-AppPlan-{{ env_name }}", sku_and_size: B2, app_serv_name: "{{ sername }}-App-{{ env_name }}" }
+    - { role: Ansible/roles/create_virtual_machine }
+
+  # tasks:
+  #   - name: create VM1
+  #     import_role:
+  #       name: Ansible/roles/create_virtual_machine
+  #     vars:
+  #       vm_name: "VM1"
+
+  #   - name: create VM2
+  #     import_role:
+  #       name: Ansible/roles/create_virtual_machine
+  #     vars:
+  #       vm_name: "VM2"
+
+- hosts: servers
+  vars: 
+    dest_folder: C:\\WebApp
+  roles:
+    - { role: Ansible/roles/server_setups }
+
+
+

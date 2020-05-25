@@ -1,0 +1,5 @@
+---
+- name: Create Resource Group {{ rg_name }}
+  azure_rm_resourcegroup:
+    name: "{{ rg_name }}"
+    location: "{{ res_location }}"

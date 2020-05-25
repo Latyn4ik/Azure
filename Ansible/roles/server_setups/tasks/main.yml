@@ -1,0 +1,56 @@
+---
+- name: Install IIS
+  win_feature:
+    name:
+    - Web-Server
+    - Web-Common-Http
+    state: present
+    restart: yes
+    include_sub_features: yes
+    include_management_tools: yes
+
+- name: Install ASP.NET Core
+  win_chocolatey:
+    name: dotnetcore-windowshosting
+    state: present
+
+- name: Create folder myapp
+  win_file:
+    path: "{{ dest_folder }}"
+    state: directory
+
+- name: Create folder myapp
+  win_file:
+    path: "{{ dest_folder }}\\publish"
+    state: directory
+
+- name: Copy project
+  win_copy:
+    src: "WebApp.zip"
+    dest: "{{ dest_folder }}\\archive\\"
+
+- name: Unarchive a file 
+  win_unzip:
+    src: "{{ dest_folder }}\\archive\\webapp.zip"
+    dest: "{{ dest_folder }}\\publish\\"
+
+- name: Remove Default Web Site
+  win_iis_website:
+    name: "Default Web Site"
+    state: absent
+  ignore_errors: True    
+
+- name: "Create a new AppPool"
+  win_iis_webapppool:
+    name: AppPool
+    state: started
+    attributes:
+      managedRuntimeVersion: v4.0
+
+- name: "Create new IIS site"
+  win_iis_website:
+    name: mysite
+    state: started
+    port: 8080
+    application_pool: AppPool
+    physical_path: "{{ dest_folder }}\\publish"

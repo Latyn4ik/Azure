@@ -1,0 +1,221 @@
+---
+- name: Create windows VM
+  azure_rm_deployment:
+    resource_group: "{{ rg_name }}"
+    name: ARM_VM
+    template: 
+      $schema: "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#"
+      contentVersion: "1.0.0.0"
+      parameters:
+        location:
+          type: "string"
+        resourseName:
+          type: "string"
+        environmentName:
+          type: "string"
+        networkSecurityGroupRules:
+          type: "array"
+        subnetName:
+          type: "string"
+        addressPrefixes:
+          type: "array"
+        subnets:
+          type: "array"
+        publicIpAddressType:
+          type: "string"
+        publicIpAddressSku:
+          type: "string"
+        osDiskType:
+          type: "string"
+        virtualMachineSize:
+          type: "string"
+        adminUsername:
+          type: "string"
+        adminPassword:
+          type: "secureString"
+        virtualMachineName:
+          type: "string"
+      variables:
+        networkSecurityGroupName: "[concat(parameters('resourseName'), '-nsg')]"
+        virtualNetworkName: "[concat(parameters('resourseName'), parameters('environmentName'),'-vnet')]"
+        nsgId: "[resourceId(resourceGroup().name, 'Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+        vnetId: "[resourceId(resourceGroup().name,'Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]"
+        subnetRef: "[concat(variables('vnetId'), '/subnets/', parameters('subnetName'))]"
+        networkInterfaceName: "[concat(parameters('resourseName'), '-net-i')]"
+        publicIpAddressName: "[concat(parameters('resourseName'), '-ip')]"
+        diagnosticsStorageAccountName: "[concat(parameters('resourseName'), 'sa', parameters('environmentName'))]"
+      resources:
+      - name: "[variables('networkInterfaceName')]"
+        type: "Microsoft.Network/networkInterfaces"
+        apiVersion: "2019-07-01"
+        location: "[parameters('location')]"
+        dependsOn:
+        - "[concat('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]"
+        - "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+        - "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName'))]"
+        properties:
+          ipConfigurations:
+          - name: "ipconfig1"
+            properties:
+              subnet:
+                id: "[variables('subnetRef')]"
+              privateIPAllocationMethod: "Dynamic"
+              publicIpAddress:
+                id: "[resourceId(resourceGroup().name, 'Microsoft.Network/publicIpAddresses', variables('publicIpAddressName'))]"
+          networkSecurityGroup:
+            id: "[variables('nsgId')]"
+      - name: "[variables('networkSecurityGroupName')]"
+        type: "Microsoft.Network/networkSecurityGroups"
+        apiVersion: "2019-02-01"
+        location: "[parameters('location')]"
+        properties:
+          securityRules: "[parameters('networkSecurityGroupRules')]"
+      - name: "[variables('virtualNetworkName')]"
+        type: "Microsoft.Network/virtualNetworks"
+        apiVersion: "2019-09-01"
+        location: "[parameters('location')]"
+        properties:
+          addressSpace:
+            addressPrefixes: "[parameters('addressPrefixes')]"
+          subnets: "[parameters('subnets')]"
+      - name: "[variables('publicIpAddressName')]"
+        type: "Microsoft.Network/publicIpAddresses"
+        apiVersion: "2019-02-01"
+        location: "[parameters('location')]"
+        properties:
+          publicIpAllocationMethod: "[parameters('publicIpAddressType')]"
+        sku:
+          name: "[parameters('publicIpAddressSku')]"
+      - name: "[parameters('virtualMachineName')]"
+        type: "Microsoft.Compute/virtualMachines"
+        apiVersion: "2019-07-01"
+        location: "[parameters('location')]"
+        dependsOn:
+        - "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName'))]"
+        properties:
+          hardwareProfile:
+            vmSize: "[parameters('virtualMachineSize')]"
+          storageProfile:
+            osDisk:
+              createOption: "fromImage"
+              managedDisk:
+                storageAccountType: "[parameters('osDiskType')]"
+            imageReference:
+              publisher: "MicrosoftWindowsServer"
+              offer: "WindowsServer"
+              sku: "2019-Datacenter"
+              version: "latest"
+          networkProfile:
+            networkInterfaces:
+            - id: "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+          osProfile:
+            computerName: "[parameters('virtualMachineName')]"
+            adminUsername: "[parameters('adminUsername')]"
+            adminPassword: "[parameters('adminPassword')]"
+            windowsConfiguration:
+              enableAutomaticUpdates: "true"
+              provisionVmAgent: "true"
+          licenseType: "Windows_Client"
+          diagnosticsProfile:
+            bootDiagnostics:
+              enabled: "true"
+              storageUri: "[concat('https://', variables('diagnosticsStorageAccountName'), '.blob.core.windows.net/')]"
+    parameters: 
+      location:
+        value: "{{ res_location }}"
+      resourseName:
+        value: "{{ sername }}"
+      networkSecurityGroupRules:
+        value:
+        - name: RDP
+          properties:
+            priority: 300
+            protocol: TCP
+            access: Allow
+            direction: Inbound
+            sourceAddressPrefix: "*"
+            sourcePortRange: "*"
+            destinationAddressPrefix: "*"
+            destinationPortRange: 3389
+        - name: OpenPort_5986
+          properties:
+            priority: 310
+            protocol: "*"
+            access: Allow
+            direction: Inbound
+            sourceAddressPrefix: "*"
+            sourcePortRange: "*"
+            destinationAddressPrefix: "*"
+            destinationPortRange: 5986
+        - name: Open_80_out
+          properties:
+            priority: 320
+            protocol: "*"
+            access: Allow
+            direction: Inbound
+            sourceAddressPrefix: "*"
+            sourcePortRange: "*"
+            destinationAddressPrefix: "*"
+            destinationPortRange: 80 
+      subnetName:
+        value: default
+      addressPrefixes:
+        value:
+        - 10.0.0.0/24
+      subnets:
+        value:
+        - name: default
+          properties:
+            addressPrefix: 10.0.0.0/24
+      publicIpAddressType:
+        value: Dynamic
+      publicIpAddressSku:
+        value: Basic
+      osDiskType:
+        value: Standard_LRS
+      virtualMachineSize:
+        value: "{{ vm_size }}"
+      adminUsername:
+        value: "{{ adminUser }}"
+      adminPassword:
+        value: "{{ password }}"
+      environmentName:
+        value: "{{ env_name }}"
+      virtualMachineName:
+        value: "{{ vm_name }}"
+  register: result
+
+- name: Setup Ansible Host
+  azure_rm_deployment:
+    resource_group: "{{ rg_name }}"
+    name: "PipelineVM{{ vm_name }}Script"
+    location: "{{ res_location }}"
+    template: 
+      "$schema": http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#
+      contentVersion: 1.0.0.0
+      resources:
+        - type: Microsoft.Compute/virtualMachines/extensions
+          name: "{{ vm_name }}/CustomScriptExtension"
+          location: "{{ res_location }}"
+          apiVersion: '2015-06-15'
+          properties:
+            publisher: Microsoft.Compute
+            type: CustomScriptExtension
+            typeHandlerVersion: '1.9'
+            autoUpgradeMinorVersion: true
+            protectedSettings:
+              commandToExecute: "powershell -ExecutionPolicy ByPass -EncodedCommand JABmAGkAbABlAD0AIgAkAGUAbgB2ADoAdABlAG0AcABcAEMAbwBuAGYAaQBnAHUAcgBlAFIAZQBtAG8AdABpAG4AZwBGAG8AcgBBAG4AcwBpAGIAbABlAC4AcABzADEAIgANAAoAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAALQBUAHkAcABlAE4AYQBtAGUAIABTAHkAcwB0AGUAbQAuAE4AZQB0AC4AVwBlAGIAQwBsAGkAZQBuAHQAKQAuAEQAbwB3AG4AbABvAGEAZABGAGkAbABlACgAIgBoAHQAdABwAHMAOgAvAC8AcgBhAHcALgBnAGkAdABoAHUAYgB1AHMAZQByAGMAbwBuAHQAZQBuAHQALgBjAG8AbQAvAGEAbgBzAGkAYgBsAGUALwBhAG4AcwBpAGIAbABlAC8AZABlAHYAZQBsAC8AZQB4AGEAbQBwAGwAZQBzAC8AcwBjAHIAaQBwAHQAcwAvAEMAbwBuAGYAaQBnAHUAcgBlAFIAZQBtAG8AdABpAG4AZwBGAG8AcgBBAG4AcwBpAGIAbABlAC4AcABzADEAIgAsACQAZgBpAGwAZQApAA0ACgAmACAAJABmAGkAbABlAA=="
+
+- name: Add hostS
+  add_host:
+    groups: "{{ hosts_name }}"
+    name: '{{ result.deployment.instances[0].ips[0].public_ip }}'
+    ansible_user: "{{ adminUser }}"
+    ansible_password: "{{ password }}"
+    ansible_connection: winrm
+    ansible_winrm_server_cert_validation: ignore
+  register: host_result
+
+- name: host output
+  debug:
+    var: host_result
