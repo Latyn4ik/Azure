@@ -147,16 +147,36 @@
             sourcePortRange: "*"
             destinationAddressPrefix: "*"
             destinationPortRange: 5986
-        - name: Open_80_out
+        - name: SSH
           properties:
             priority: 320
-            protocol: "*"
+            protocol: TCP
             access: Allow
             direction: Inbound
             sourceAddressPrefix: "*"
             sourcePortRange: "*"
             destinationAddressPrefix: "*"
-            destinationPortRange: 80 
+            destinationPortRange: 22
+        - name: HTTPS
+          properties:
+            priority: 340
+            protocol: TCP
+            access: Allow
+            direction: Inbound
+            sourceAddressPrefix: "*"
+            sourcePortRange: "*"
+            destinationAddressPrefix: "*"
+            destinationPortRange: 443
+        - name: HTTP
+          properties:
+            priority: 360
+            protocol: TCP
+            access: Allow
+            direction: Inbound
+            sourceAddressPrefix: "*"
+            sourcePortRange: "*"
+            destinationAddressPrefix: "*"
+            destinationPortRange: 80
       subnetName:
         value: default
       addressPrefixes:

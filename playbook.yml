@@ -11,9 +11,9 @@
     sa_name: "{{ sername }}sa{{ env_name }}"
     storage_type:  Standard_RAGRS
 
-    vm_name: "ilat-vm"
+    #vm_name: "ilat-vm"
     adminUser: __adminUsername__
-    password:  __adminPass__
+    password: __adminPass__
     vm_size: Standard_B2s
     hosts_name: servers
 

@@ -4,6 +4,8 @@ trigger:
 variables:
   name: 'ilatincev'
   enviroment_name: 'test'
+  VM_name: 'ilat-vm'
+  artifact_path: $(Build.ArtifactStagingDirectory)/WebApp.zip
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -12,14 +14,46 @@ steps:
 - task: AzureKeyVault@1
   displayName: Key Vault Secrets
   inputs:
-    azureSubscription: 'ilatincev-sevice-connection'
+    azureSubscription: 'ilatincev-service-connection'
     KeyVaultName: 'ilatincev-kv'
     SecretsFilter: '*'
+
+
+- task: DotNetCoreCLI@2
+  displayName: Build App
+  inputs:
+    command: 'build'
+    projects: '**/*.csproj'
+
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'test'
+    projects: '**/*.csproj'
+    testRunTitle: 'Main Test run'
+
+- task: DotNetCoreCLI@2
+  displayName: Publish App
+  inputs:
+    command: 'publish'
+    publishWebProjects: true
+    arguments: --configuration Release --output $(Build.ArtifactStagingDirectory)
+    zipAfterPublish: true
+
+- task: PublishBuildArtifacts@1
+  displayName: Publish Artifacts
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'webApp'
+    publishLocation: 'Container'
+
+- script: |
+      echo $(Build.ArtifactStagingDirectory)
+      echo $(artifact_path)
 
 - task: AzureCLI@2
   name: InitAz
   inputs:
-    azureSubscription: 'ilatincev-sevice-connection'
+    azureSubscription: 'ilatincev-service-connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
@@ -54,32 +88,16 @@ steps:
     playbookPathOnAgentMachine: 'playbook.yml'
     inventoriesAgentMachine: 'noInventory'
     failOnStdErr: false
+    args: '--extra-vars "vm_name=$(VM_name) path_to_artifact=$(artifact_path)"'
 
-
-- task: DotNetCoreCLI@2
-  displayName: Build App
-  inputs:
-    command: 'build'
-    projects: '**/*.csproj'
-
-- task: DotNetCoreCLI@2
-  displayName: Publish App
-  inputs:
-    command: 'publish'
-    publishWebProjects: true
-    arguments: --configuration Release --output $(Build.ArtifactStagingDirectory)
-    zipAfterPublish: true
-
-- task: PublishBuildArtifacts@1
-  displayName: Publish Artifacts
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    ArtifactName: 'webApp'
-    publishLocation: 'Container'
+# - task: IISWebAppDeploymentOnMachineGroup@0
+#   inputs:
+#     WebSiteName: $(VM_name)
+#     Package: '$(Build.ArtifactStagingDirectory)/WebApp.zip'
 
 - task: AzureWebApp@1
   inputs:
-    azureSubscription: 'ilatincev-sevice-connection'
+    azureSubscription: 'ilatincev-service-connection'
     appType: 'webApp'
     appName: '$(name)-App-$(enviroment_name)'
     deployToSlotOrASE: true

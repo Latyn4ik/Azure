@@ -1,4 +1,5 @@
 ---
+
 - name: Install IIS
   win_feature:
     name:
@@ -26,7 +27,8 @@
 
 - name: Copy project
   win_copy:
-    src: "WebApp.zip"
+    remote_src: yes
+    src: "{{ path_to_artifact }}"
     dest: "{{ dest_folder }}\\archive\\"
 
 - name: Unarchive a file 
@@ -51,6 +53,6 @@
   win_iis_website:
     name: mysite
     state: started
-    port: 8080
+    port: 80
     application_pool: AppPool
     physical_path: "{{ dest_folder }}\\publish"
